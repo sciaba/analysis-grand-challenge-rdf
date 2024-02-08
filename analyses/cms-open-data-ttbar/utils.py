@@ -94,7 +94,6 @@ def retrieve_inputs(
 
             file_paths = [f["path"] for f in sample_info]
             prefix = "https://xrootd-local.unl.edu:1094//store/user/AGC"
-            assert all(f.startswith(prefix) for f in file_paths)
 
             if remote_data_prefix is not None:
                 old_prefix, prefix = prefix, remote_data_prefix
