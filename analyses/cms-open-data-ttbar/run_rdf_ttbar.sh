@@ -1,7 +1,7 @@
 #! /bin/bash
 
 # Default values
-maxjobs=4
+maxjobs=9
 afname="cms-xrootd"
 workers=4
 
@@ -106,7 +106,7 @@ WDIR="${WDIR}${nfiles}_${afname}_${workers}"
 njobs=$(ls -1d ${WDIR} ${WDIR}.* 2> /dev/null | wc -l)
 if [[ $njobs -ge ${maxjobs} ]] ; then
     echo "Enough jobs already. Exiting..."
-    exit 1
+    exit 2
 fi
 pre=$(ls -1d ${WDIR}.* 2> /dev/null | tail -1)
 if [ -n "$pre" ] ; then
@@ -149,9 +149,9 @@ ln -s ../models .
 ln -s ../plotting.py .
 ln -s ../utils.py .
 
-#export EXTRA_CLING_ARGS="-O2"
-#export XRD_APPNAME="AGCRDF"
-#export XRD_RECORDERPATH=$PWD/xrdrecord.csv
+export EXTRA_CLING_ARGS="-O2"
+export XRD_APPNAME="AGCRDF"
+export XRD_RECORDERPATH=$PWD/xrdrecord.csv
 
 env > env.out
 sudo sysctl vm.drop_caches=3
