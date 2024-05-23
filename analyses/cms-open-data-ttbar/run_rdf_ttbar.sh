@@ -1,12 +1,24 @@
 #! /bin/bash
 
+CONDA_ENV=root-nightly-240523
+XRD_ENV=v5.6.9-77-gfab4b32f1
+conda -V &> /dev/null
+if [[ $? -ne 0 ]] ; then
+    source /shared/asciaba/conda_activate.sh
+    conda activate ${CONDA_ENV}
+fi
+
+if [[ $(xrdcp --version 2>&1) != ${XRD_ENV} ]] ; then
+    export PATH=/shared/asciaba/bin:$PATH
+fi
+
 # Default values
 maxjobs=9
 afname="cms-xrootd"
 workers=4
 
 usage() {
-    echo "Usage : run_rdf_ttbar.sh [-n NFILES] -a AFNAME -w NWORKERS [-r] [-x hdd|sdd] [-p] [-h]"
+    echo "Usage : run_rdf_ttbar.sh [-n NFILES] -a AFNAME -w NWORKERS [-r] [-x hdd|sdd] [-h]"
     echo
     echo "        -n NFILES: specify the maximum number of files per dataset"
     echo "        -a AFNAME: specify the data source. Possible choices:"
@@ -17,7 +29,6 @@ usage() {
     echo "                   cern-local: from the local filesystem of iopef01"
     echo "        -w NWORKERS: specify how many workers should be used"
     echo "        -x hdd/ssd: read through the CERN X-Cache instance"
-    echo "        -p: add export XRD_PARALLELEVTLOOP=10 to optimise xrootd I/O"
     echo "        -r: use the RNTuple dataset (default is TTree)"
     echo "        -h: this help message"
 }
@@ -33,14 +44,8 @@ while getopts "n:a:w:x:prh" arg; do
 	w)
 	    workers=$OPTARG
 	    ;;
-	s)
-	    substreams=$OPTARG
-	    ;;
 	x)
 	    xcache=$OPTARG
-	    ;;
-	p)
-	    xrdopt=1
 	    ;;
 	r)
 	    rntuple=1
@@ -65,20 +70,8 @@ ARGS="$ARGS -c ${workers}"
 
 if [ -z "${rntuple}" ] ; then
     WDIR="rdf_ttbar_ttree_run_"
-    dataset="agc_nanoaod.txt"
 else
     WDIR="rdf_ttbar_rntuple_run_"
-    dataset="agc_rntuple.txt"
-fi
-
-if [ -n "${xrdopt}" ] ; then
-    export XRD_PARALLELEVTLOOP=10
-    WDIR="${WDIR}xrd_"
-fi
-
-if [ -n "${substreams}" ] ; then
-   export XRD_SUBSTREAMSPERCHANNEL=${substreams}
-   WDIR="${WDIR}ss-${substreams}_"
 fi
 
 if [ -z "${xcache}" ] ; then
@@ -126,16 +119,19 @@ if [ $? != 0 ] ; then
 fi
 
 cd ${WDIR}
+
+NC=$(printf "%03d" $(( $RANDOM % 10 + 1 )))   # Choose one among 10 identical input datasets
+
 if [[ "${afname}" == 'cms-xrootd' ]] ; then
-    cat ../nanoaod_inputs.json | sed 's#https://xrootd-local.unl.edu:1094//store/user/AGC#root://eoscms.cern.ch//eos/cms/opstest/asciaba/agc/datasets#' > nanoaod_inputs.json
+    cat ../nanoaod_inputs.json | sed "s#https://xrootd-local.unl.edu:1094//store/user/AGC#root://eoscms.cern.ch//eos/cms/opstest/asciaba/agc/datasets#" > nanoaod_inputs.json
 elif [[ "${afname}" == 'pilot-xrootd' ]] ; then
-    cat ../nanoaod_inputs.json | sed 's#https://xrootd-local.unl.edu:1094//store/user/AGC#root://eospilot.cern.ch//eos/pilot/rntuple/agc/datasets#' > nanoaod_inputs.json
+    cat ../nanoaod_inputs.json | sed "s#https://xrootd-local.unl.edu:1094//store/user/AGC#root://eospilot.cern.ch//eos/pilot/rntuple/data-rep/agc.${NC}/agc/datasets/ttree-zstd#" > nanoaod_inputs.json
 elif [[ "${afname}" == 'local-xrootd' ]] ; then
-    cat ../nanoaod_inputs.json | sed 's#https://xrootd-local.unl.edu:1094//store/user/AGC#/data/datasets/agc/datasets#' > nanoaod_inputs.json
+    cat ../nanoaod_inputs.json | sed "s#https://xrootd-local.unl.edu:1094//store/user/AGC#/data/datasets/agc/datasets#" > nanoaod_inputs.json
 fi
 
 if [[ "${rntuple}" -eq 1 ]] ; then
-    sed -i 's/nanoAOD/nanoAODRNTuple/' nanoaod_inputs.json
+    sed -i 's/ttree-zstd/rntuple/' nanoaod_inputs.json
 fi
 
 ln -s ../analysis.py .
@@ -150,6 +146,7 @@ ln -s ../plotting.py .
 ln -s ../utils.py .
 
 export EXTRA_CLING_ARGS="-O2"
+export XRD_PARALLELEVTLOOP=10
 export XRD_APPNAME="AGCRDF"
 export XRD_RECORDERPATH=$PWD/xrdrecord.csv
 
